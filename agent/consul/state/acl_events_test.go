@@ -5,291 +5,131 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/consul/agent/agentpb"
+	"github.com/hashicorp/consul/agent/consul/stream"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/stretchr/testify/require"
 )
-
-func testACLTokenEvent(t *testing.T, idx uint64, n int, delete bool) agentpb.Event {
-	t.Helper()
-	uuid := strings.ReplaceAll("11111111-????-????-????-????????????", "?",
-		strconv.Itoa(n))
-	op := agentpb.ACLOp_Update
-	if delete {
-		op = agentpb.ACLOp_Delete
-	}
-	return agentpb.Event{
-		Topic: agentpb.Topic_ACLTokens,
-		Index: idx,
-		Payload: &agentpb.Event_ACLToken{
-			ACLToken: &agentpb.ACLTokenUpdate{
-				Op: op,
-				Token: &agentpb.ACLTokenIdentifier{
-					AccessorID: uuid,
-					SecretID:   uuid,
-				},
-			},
-		},
-	}
-}
-
-func testACLPolicyEvent(t *testing.T, idx uint64, n int, delete bool) agentpb.Event {
-	t.Helper()
-	uuid := strings.ReplaceAll("22222222-????-????-????-????????????", "?",
-		strconv.Itoa(n))
-	op := agentpb.ACLOp_Update
-	if delete {
-		op = agentpb.ACLOp_Delete
-	}
-	return agentpb.Event{
-		Topic: agentpb.Topic_ACLPolicies,
-		Index: idx,
-		Payload: &agentpb.Event_ACLPolicy{
-			ACLPolicy: &agentpb.ACLPolicyUpdate{
-				Op:       op,
-				PolicyID: uuid,
-			},
-		},
-	}
-}
-
-func testACLRoleEvent(t *testing.T, idx uint64, n int, delete bool) agentpb.Event {
-	t.Helper()
-	uuid := strings.ReplaceAll("33333333-????-????-????-????????????", "?",
-		strconv.Itoa(n))
-	op := agentpb.ACLOp_Update
-	if delete {
-		op = agentpb.ACLOp_Delete
-	}
-	return agentpb.Event{
-		Topic: agentpb.Topic_ACLRoles,
-		Index: idx,
-		Payload: &agentpb.Event_ACLRole{
-			ACLRole: &agentpb.ACLRoleUpdate{
-				Op:     op,
-				RoleID: uuid,
-			},
-		},
-	}
-}
-
-func testToken(t *testing.T, n int) *structs.ACLToken {
-	uuid := strings.ReplaceAll("11111111-????-????-????-????????????", "?",
-		strconv.Itoa(n))
-	return &structs.ACLToken{
-		AccessorID: uuid,
-		SecretID:   uuid,
-	}
-}
-
-func testPolicy(t *testing.T, n int) *structs.ACLPolicy {
-	numStr := strconv.Itoa(n)
-	uuid := strings.ReplaceAll("22222222-????-????-????-????????????", "?", numStr)
-	return &structs.ACLPolicy{
-		ID:    uuid,
-		Name:  "test_policy_" + numStr,
-		Rules: `operator = "read"`,
-	}
-}
-
-func testRole(t *testing.T, n, p int) *structs.ACLRole {
-	numStr := strconv.Itoa(n)
-	uuid := strings.ReplaceAll("33333333-????-????-????-????????????", "?", numStr)
-	policy := testPolicy(t, p)
-	return &structs.ACLRole{
-		ID:   uuid,
-		Name: "test_role_" + numStr,
-		Policies: []structs.ACLRolePolicyLink{{
-			ID:   policy.ID,
-			Name: policy.Name,
-		}},
-	}
-}
 
 func TestACLEventsFromChanges(t *testing.T) {
 	cases := []struct {
 		Name       string
 		Setup      func(s *Store, tx *txn) error
 		Mutate     func(s *Store, tx *txn) error
-		WantEvents []agentpb.Event
-		WantErr    bool
+		WantEvents []stream.Event
 	}{
 		{
 			Name: "token create",
 			Mutate: func(s *Store, tx *txn) error {
-				if err := s.aclTokenSetTxn(tx, tx.Index, testToken(t, 1), false, false, false, false); err != nil {
-					return err
-				}
-				return nil
+				return s.aclTokenSetTxn(tx, tx.Index, newACLToken(1), false, false, false, false)
 			},
-			WantEvents: []agentpb.Event{
-				testACLTokenEvent(t, 100, 1, false),
+			WantEvents: []stream.Event{
+				newACLTokenEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "token update",
 			Setup: func(s *Store, tx *txn) error {
-				if err := s.aclTokenSetTxn(tx, tx.Index, testToken(t, 1), false, false, false, false); err != nil {
-					return err
-				}
-				return nil
+				return s.aclTokenSetTxn(tx, tx.Index, newACLToken(1), false, false, false, false)
 			},
 			Mutate: func(s *Store, tx *txn) error {
 				// Add a policy to the token (never mind it doesn't exist for now) we
 				// allow it in the set command below.
-				token := testToken(t, 1)
+				token := newACLToken(1)
 				token.Policies = []structs.ACLTokenPolicyLink{{ID: "33333333-1111-1111-1111-111111111111"}}
-				if err := s.aclTokenSetTxn(tx, tx.Index, token, false, true, false, false); err != nil {
-					return err
-				}
-				return nil
+				return s.aclTokenSetTxn(tx, tx.Index, token, false, true, false, false)
 			},
-			WantEvents: []agentpb.Event{
-				// Should see an event from the update
-				testACLTokenEvent(t, 100, 1, false),
+			WantEvents: []stream.Event{
+				newACLTokenEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "token delete",
 			Setup: func(s *Store, tx *txn) error {
-				if err := s.aclTokenSetTxn(tx, tx.Index, testToken(t, 1), false, false, false, false); err != nil {
-					return err
-				}
-				return nil
+				return s.aclTokenSetTxn(tx, tx.Index, newACLToken(1), false, false, false, false)
 			},
 			Mutate: func(s *Store, tx *txn) error {
-				// Delete it
-				token := testToken(t, 1)
-				if err := s.aclTokenDeleteTxn(tx, tx.Index, token.AccessorID, "id", nil); err != nil {
-					return err
-				}
-				return nil
+				token := newACLToken(1)
+				return s.aclTokenDeleteTxn(tx, tx.Index, token.AccessorID, "id", nil)
 			},
-			WantEvents: []agentpb.Event{
-				// Should see a delete event
-				testACLTokenEvent(t, 100, 1, true),
+			WantEvents: []stream.Event{
+				newACLTokenEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "policy create",
 			Mutate: func(s *Store, tx *txn) error {
-				if err := s.aclPolicySetTxn(tx, tx.Index, testPolicy(t, 1)); err != nil {
-					return err
-				}
-				return nil
+				return s.aclPolicySetTxn(tx, tx.Index, newACLPolicy(1))
 			},
-			WantEvents: []agentpb.Event{
-				testACLPolicyEvent(t, 100, 1, false),
+			WantEvents: []stream.Event{
+				newACLPolicyEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "policy update",
 			Setup: func(s *Store, tx *txn) error {
-				if err := s.aclPolicySetTxn(tx, tx.Index, testPolicy(t, 1)); err != nil {
-					return err
-				}
-				return nil
+				return s.aclPolicySetTxn(tx, tx.Index, newACLPolicy(1))
 			},
 			Mutate: func(s *Store, tx *txn) error {
-				policy := testPolicy(t, 1)
+				policy := newACLPolicy(1)
 				policy.Rules = `operator = "write"`
-				if err := s.aclPolicySetTxn(tx, tx.Index, policy); err != nil {
-					return err
-				}
-				return nil
+				return s.aclPolicySetTxn(tx, tx.Index, policy)
 			},
-			WantEvents: []agentpb.Event{
-				// Should see an event from the update
-				testACLPolicyEvent(t, 100, 1, false),
+			WantEvents: []stream.Event{
+				newACLPolicyEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "policy delete",
 			Setup: func(s *Store, tx *txn) error {
-				if err := s.aclPolicySetTxn(tx, tx.Index, testPolicy(t, 1)); err != nil {
-					return err
-				}
-				return nil
+				return s.aclPolicySetTxn(tx, tx.Index, newACLPolicy(1))
 			},
 			Mutate: func(s *Store, tx *txn) error {
-				// Delete it
-				policy := testPolicy(t, 1)
-				if err := s.aclPolicyDeleteTxn(tx, tx.Index, policy.ID, s.aclPolicyGetByID, nil); err != nil {
-					return err
-				}
-				return nil
+				policy := newACLPolicy(1)
+				return s.aclPolicyDeleteTxn(tx, tx.Index, policy.ID, s.aclPolicyGetByID, nil)
 			},
-			WantEvents: []agentpb.Event{
-				// Should see a delete event
-				testACLPolicyEvent(t, 100, 1, true),
+			WantEvents: []stream.Event{
+				newACLPolicyEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "role create",
 			Mutate: func(s *Store, tx *txn) error {
-				if err := s.aclRoleSetTxn(tx, tx.Index, testRole(t, 1, 1), true); err != nil {
-					return err
-				}
-				return nil
+				return s.aclRoleSetTxn(tx, tx.Index, newACLRole(1, 1), true)
 			},
-			WantEvents: []agentpb.Event{
-				testACLRoleEvent(t, 100, 1, false),
+			WantEvents: []stream.Event{
+				newACLRoleEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "role update",
 			Setup: func(s *Store, tx *txn) error {
-				if err := s.aclRoleSetTxn(tx, tx.Index, testRole(t, 1, 1), true); err != nil {
-					return err
-				}
-				return nil
+				return s.aclRoleSetTxn(tx, tx.Index, newACLRole(1, 1), true)
 			},
 			Mutate: func(s *Store, tx *txn) error {
-				role := testRole(t, 1, 1)
-				policy2 := testPolicy(t, 2)
+				role := newACLRole(1, 1)
+				policy2 := newACLPolicy(2)
 				role.Policies = append(role.Policies, structs.ACLRolePolicyLink{
 					ID:   policy2.ID,
 					Name: policy2.Name,
 				})
-				if err := s.aclRoleSetTxn(tx, tx.Index, role, true); err != nil {
-					return err
-				}
-				return nil
+				return s.aclRoleSetTxn(tx, tx.Index, role, true)
 			},
-			WantEvents: []agentpb.Event{
-				// Should see an event from the update
-				testACLRoleEvent(t, 100, 1, false),
+			WantEvents: []stream.Event{
+				newACLRoleEvent(100, 1),
 			},
-			WantErr: false,
 		},
 		{
 			Name: "role delete",
 			Setup: func(s *Store, tx *txn) error {
-				if err := s.aclRoleSetTxn(tx, tx.Index, testRole(t, 1, 1), true); err != nil {
-					return err
-				}
-				return nil
+				return s.aclRoleSetTxn(tx, tx.Index, newACLRole(1, 1), true)
 			},
 			Mutate: func(s *Store, tx *txn) error {
-				// Delete it
-				role := testRole(t, 1, 1)
-				if err := s.aclRoleDeleteTxn(tx, tx.Index, role.ID, s.aclRoleGetByID, nil); err != nil {
-					return err
-				}
-				return nil
+				role := newACLRole(1, 1)
+				return s.aclRoleDeleteTxn(tx, tx.Index, role.ID, s.aclRoleGetByID, nil)
 			},
-			WantEvents: []agentpb.Event{
-				// Should see a delete event
-				testACLRoleEvent(t, 100, 1, true),
+			WantEvents: []stream.Event{
+				newACLRoleEvent(100, 1),
 			},
-			WantErr: false,
 		},
 	}
 
@@ -315,28 +155,135 @@ func TestACLEventsFromChanges(t *testing.T) {
 
 			// Note we call the func under test directly rather than publishChanges so
 			// we can test this in isolation.
-			got, err := s.ACLEventsFromChanges(tx, tx.Changes())
-			if tc.WantErr {
-				require.Error(t, err)
-				return
-			}
+			got, err := aclEventsFromChanges(tx, tx.Changes())
 			require.NoError(t, err)
 
 			// Make sure we have the right events, only taking ordering into account
 			// where it matters to account for non-determinism.
-			requireEventsInCorrectPartialOrder(t, tc.WantEvents, got, func(e agentpb.Event) string {
+			requireEventsInCorrectPartialOrder(t, tc.WantEvents, got, func(e stream.Event) string {
 				// We only care that events affecting the same actual token are ordered
-				// with respect ot each other so use it's ID as the key.
+				// with respect to each other so use it's ID as the key.
 				switch v := e.Payload.(type) {
-				case *agentpb.Event_ACLToken:
-					return "token:" + v.ACLToken.Token.AccessorID
-				case *agentpb.Event_ACLPolicy:
-					return "policy:" + v.ACLPolicy.PolicyID
-				case *agentpb.Event_ACLRole:
-					return "role:" + v.ACLRole.RoleID
+				case *structs.ACLToken:
+					return "token:" + v.AccessorID
+				case *structs.ACLPolicy:
+					return "policy:" + v.ID
+				case *structs.ACLRole:
+					return "role:" + v.ID
 				}
 				return ""
 			})
 		})
+	}
+}
+
+func newACLTokenEvent(idx uint64, n int) stream.Event {
+	uuid := strings.ReplaceAll("11111111-????-????-????-????????????", "?", strconv.Itoa(n))
+	return stream.Event{
+		Topic: stream.Topic_ACLTokens,
+		Index: idx,
+		Payload: &structs.ACLToken{
+			AccessorID: uuid,
+			SecretID:   uuid,
+		},
+	}
+}
+
+func newACLPolicyEvent(idx uint64, n int) stream.Event {
+	uuid := strings.ReplaceAll("22222222-????-????-????-????????????", "?", strconv.Itoa(n))
+	return stream.Event{
+		Topic: stream.Topic_ACLPolicies,
+		Index: idx,
+		Payload: &structs.ACLPolicy{
+			ID: uuid,
+		},
+	}
+}
+
+func newACLRoleEvent(idx uint64, n int) stream.Event {
+	uuid := strings.ReplaceAll("33333333-????-????-????-????????????", "?", strconv.Itoa(n))
+	return stream.Event{
+		Topic: stream.Topic_ACLRoles,
+		Index: idx,
+		Payload: &structs.ACLRole{
+			ID: uuid,
+		},
+	}
+}
+
+func newACLToken(n int) *structs.ACLToken {
+	uuid := strings.ReplaceAll("11111111-????-????-????-????????????", "?", strconv.Itoa(n))
+	return &structs.ACLToken{
+		AccessorID: uuid,
+		SecretID:   uuid,
+	}
+}
+
+func newACLPolicy(n int) *structs.ACLPolicy {
+	numStr := strconv.Itoa(n)
+	uuid := strings.ReplaceAll("22222222-????-????-????-????????????", "?", numStr)
+	return &structs.ACLPolicy{
+		ID:    uuid,
+		Name:  "test_policy_" + numStr,
+		Rules: `operator = "read"`,
+	}
+}
+
+func newACLRole(n, p int) *structs.ACLRole {
+	numStr := strconv.Itoa(n)
+	uuid := strings.ReplaceAll("33333333-????-????-????-????????????", "?", numStr)
+	policy := newACLPolicy(p)
+	return &structs.ACLRole{
+		ID:   uuid,
+		Name: "test_role_" + numStr,
+		Policies: []structs.ACLRolePolicyLink{{
+			ID:   policy.ID,
+			Name: policy.Name,
+		}},
+	}
+}
+
+// requireEventsInCorrectPartialOrder compares that the expected set of events
+// was emitted. It allows for _independent_ events to be emitted in any order -
+// this can be important because even though the transaction processing is all
+// strictly ordered up until the processing func, grouping multiple updates that
+// affect the same logical entity may be necessary and may impose random
+// ordering changes on the eventual events if a map is used. We only care that
+// events _affecting the same topic and key_ are ordered correctly with respect
+// to the "expected" set of events so this helper asserts that.
+//
+// The caller provides a func that can return a partition key for the given
+// event types and we assert that all events with the same partition key are
+// deliveries in the same order. Note that this is not necessarily the same as
+// topic/key since for example in Catalog only events about a specific service
+// _instance_ need to be ordered while topic and key are more general.
+func requireEventsInCorrectPartialOrder(
+	t *testing.T,
+	want, got []stream.Event,
+	partKey func(stream.Event) string,
+) {
+	t.Helper()
+
+	// Partion both arrays by topic/key
+	wantParts := make(map[string][]stream.Event)
+	gotParts := make(map[string][]stream.Event)
+
+	for _, e := range want {
+		k := partKey(e)
+		wantParts[k] = append(wantParts[k], e)
+	}
+	for _, e := range got {
+		k := partKey(e)
+		gotParts[k] = append(gotParts[k], e)
+	}
+
+	for k, want := range wantParts {
+		require.Equal(t, want, gotParts[k], "got incorrect events for partition: %s", k)
+	}
+
+	for k, got := range gotParts {
+		if _, ok := wantParts[k]; !ok {
+			require.Equal(t, nil, got, "got unwanted events for partition: %s", k)
+		}
 	}
 }
