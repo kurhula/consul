@@ -23,4 +23,10 @@ func (e Event) isEndOfSnapshot() bool {
 	return e.Payload == endOfSnapshot{}
 }
 
+func (e Event) IsResumeStream() bool {
+	return e.Payload == ResumeStream{}
+}
+
 type endOfSnapshot struct{}
+
+type ResumeStream struct{}
