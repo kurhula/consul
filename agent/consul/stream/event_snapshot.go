@@ -1,9 +1,5 @@
 package stream
 
-import (
-	"github.com/hashicorp/consul/agent/agentpb"
-)
-
 // EventSnapshot represents the state of memdb for a given topic and key at some
 // point in time. It is modelled as a buffer of events so that snapshots can be
 // streamed to possibly multiple subscribers concurrently, and can be trivially
@@ -47,13 +43,12 @@ func NewEventSnapshot(req *SubscribeRequest, topicBufferHead *BufferItem, fn Sna
 			return
 		}
 		// We wrote the snapshot events to the buffer, send the "end of snapshot" event
+		// TODO: could this be done with an error?
 		s.snapBuffer.Append([]Event{{
-			Topic: req.Topic,
-			Key:   req.Key,
-			Index: idx,
-			Payload: &agentpb.Event_EndOfSnapshot{
-				EndOfSnapshot: true,
-			},
+			Topic:   req.Topic,
+			Key:     req.Key,
+			Index:   idx,
+			Payload: endOfSnapshot{},
 		}})
 		s.spliceFromTopicBuffer(topicBufferHead, idx)
 	}()

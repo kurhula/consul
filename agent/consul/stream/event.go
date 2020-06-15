@@ -18,3 +18,9 @@ type Event struct {
 	Index   uint64
 	Payload interface{}
 }
+
+func (e Event) isEndOfSnapshot() bool {
+	return e.Payload == endOfSnapshot{}
+}
+
+type endOfSnapshot struct{}

@@ -8,13 +8,14 @@ import (
 	time "time"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/hashicorp/consul/agent/agentpb"
 )
 
+// A property-based test to ensure that under heavy concurrent use trivial
+// correctness properties are not violated (and that -race doesn't complain).
 func TestEventBufferFuzz(t *testing.T) {
-	// A property-based test to ensure that under heavy concurrent use trivial
-	// correctness properties are not violated (and that -race doesn't complain).
+	if testing.Short() {
+		t.Skip("too slow for short run")
+	}
 
 	nReaders := 1000
 	nMessages := 1000
@@ -38,9 +39,6 @@ func TestEventBufferFuzz(t *testing.T) {
 			e := Event{
 				Index: uint64(i), // Indexes should be contiguous
 				Topic: Topic_ServiceHealth,
-				Payload: &agentpb.Event_EndOfSnapshot{
-					EndOfSnapshot: true,
-				},
 			}
 			b.Append([]Event{e})
 			// Sleep sometimes for a while to let some subscribers catch up
