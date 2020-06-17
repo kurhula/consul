@@ -936,7 +936,7 @@ and consider if they're appropriate for your deployment.
 
     - `replicas` ((#v-terminatinggateways-defaults-replicas)) (`int: 2`) - Number of replicas for each terminating gateway defined.
 
-    - `extraVolumes ((#v=terminatinggateways-defaults-extraVolumes)) (`array: []`) - A list of extra volumes to mount. These will be exposed to Consul in the path `/consul/userconfig/<name>/`.
+    - `extraVolumes` ((#v=terminatinggateways-defaults-extraVolumes)) (`array: []`) - A list of extra volumes to mount. These will be exposed to Consul in the path `/consul/userconfig/<name>/`.
 
       ```yaml
       extraVolumes:
