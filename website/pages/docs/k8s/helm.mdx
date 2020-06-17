@@ -876,7 +876,7 @@ and consider if they're appropriate for your deployment.
 
   - `annotations` ((#v-meshgateway-annotations)) (`string: null`) - Annotations for the mesh gateway deployment.
 
-- `ingressGateways` ((#v-ingressgateways)) - Configuration options for ingress gateways. Default values for all ingress gateways are defined in `ingressGateways.defaults`. Any of these values may be overridden in `ingressGateways.gateways` for a specific gateway with the exception of annotations. Annotations will include both the default annotations and any additional ones defined for a specific gateway. Requirements: consul >= 1.8.0. If using global.acls.manageSystemACLs, consul-k8s >= 0.16.0 is needed.
+- `ingressGateways` ((#v-ingressgateways)) - Configuration options for ingress gateways. Default values for all ingress gateways are defined in `ingressGateways.defaults`. Any of these values may be overridden in `ingressGateways.gateways` for a specific gateway with the exception of annotations. Annotations will include both the default annotations and any additional ones defined for a specific gateway. Requirements: consul >= 1.8.0. If using `global.acls.manageSystemACLs`, consul-k8s >= 0.16.0 is needed.
 
   - `enabled` ((#v-ingressgateways-enabled)) (`bool: false`) - Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
 
@@ -890,7 +890,7 @@ and consider if they're appropriate for your deployment.
 
       - `ports` ((#v-ingressgateways-defaults-service-ports)) - Ports that will be exposed on the service and gateway container. Any ports defined as ingress listeners on the gateway's Consul configuration entry should be included here. The first port will be used as part of the Consul service registration for the gateway and be listed in its SRV record. If using a NodePort service type, you must specify the desired nodePort for each exposed port.
 
-        - `port` ((#v-ingressgateways-defaults-service-ports-port)) (`int: 80`) - Port to open in both ingress gateway container and the service fronting the deployment. These should correspond to the listeners defined in the gateways' Consul configuration entry. The first defined port to be used in the Consul service registration for the ingress gateway and be listed in its SRV record. Note: GKE does not allow exposing port 80.
+        - `port` ((#v-ingressgateways-defaults-service-ports-port)) (`int: 8080`) - Port to open in both ingress gateway container and the service fronting the deployment. These should correspond to the listeners defined in the gateways' Consul configuration entry. The first defined port to be used in the Consul service registration for the ingress gateway and be listed in its SRV record. Note: GKE does not allow exposing port 80.
 
         - `nodePort` ((#v-ingressgateways-defaults-service-ports-nodeport)) (`int: null`) - The nodePort to open if using a NodePort type service. The first defined nodePort will be used with the Kubernetes node's host ip in the Consul service registration.
 
@@ -920,15 +920,14 @@ and consider if they're appropriate for your deployment.
         "annotation-key": "annotation-value"
       ```
 
-    - `consulNamespace` ((#v-ingressgateways-defaults-consulnamespace)) (`string: default`) <EnterpriseAlert inline /> - Defines the Consul namespace to register the gateway into.  Requires `global.enableConsulNamespaces` to be true and
+    - `consulNamespace` ((#v-ingressgateways-defaults-consulnamespace)) (`string: "default"`) <EnterpriseAlert inline /> - Defines the Consul namespace to register the gateway into.  Requires `global.enableConsulNamespaces` to be true and
     Consul Enterprise v1.7+ with a valid Consul Enterprise license. Note: The Consul namespace MUST exist before the gateway is deployed.
-
 
   - `gateways` ((#v-ingressgateways-gateways)) - Gateways is a list of gateway objects. The only required field for each is `name`, though they can also contain any of the fields in `ingressGateways.defaults`. Values defined here override the defaults except in the case of annotations where both will be applied.
 
     - `name` ((#v-ingressgateways-gateways-name)) (`string: "ingress-gateway"`) - The name of the ingress gateway.
 
-- `terminatingGateways` ((#v-terminatinggateways)) - Configuration options for terminating gateways. Default values for all terminating gateways are defined in `terminatingGateways.defaults`. Any of these values may be overridden in `terminatingGateways.gateways` for a specific gateway with the exception of annotations. Annotations will include both the default annotations and any additional ones defined for a specific gateway. Requirements: consul >= 1.8.0. If using global.acls.manageSystemACLs, consul-k8s >= 0.16.0 is needed.
+- `terminatingGateways` ((#v-terminatinggateways)) - Configuration options for terminating gateways. Default values for all terminating gateways are defined in `terminatingGateways.defaults`. Any of these values may be overridden in `terminatingGateways.gateways` for a specific gateway with the exception of annotations. Annotations will include both the default annotations and any additional ones defined for a specific gateway. Requirements: consul >= 1.8.0. If using `global.acls.manageSystemACLs`, consul-k8s >= 0.16.0 is needed.
 
   - `enabled` ((#v-terminatinggateways-enabled)) (`bool: false`) - Enable terminating gateway deployment. Requires `connectInject.enabled=true`.
 
@@ -964,7 +963,7 @@ and consider if they're appropriate for your deployment.
         "annotation-key": "annotation-value"
       ```
 
-    - `consulNamespace` ((#v-terminatinggateways-defaults-consulnamespace)) (`string: default`) <EnterpriseAlert inline /> - Defines the Consul namespace to register the gateway into.  Requires `global.enableConsulNamespaces` to be true and Consul Enterprise v1.7+ with a valid Consul Enterprise license. Note: The Consul namespace MUST exist before the gateway is deployed.
+    - `consulNamespace` ((#v-terminatinggateways-defaults-consulnamespace)) (`string: "default"`) <EnterpriseAlert inline /> - Defines the Consul namespace to register the gateway into.  Requires `global.enableConsulNamespaces` to be true and Consul Enterprise v1.7+ with a valid Consul Enterprise license. Note: The Consul namespace MUST exist before the gateway is deployed.
 
   - `gateways` ((#v-terminatinggateways-gateways)) - Gateways is a list of gateway objects. The only required field for each is `name`, though they can also contain any of the fields in `terminatingGateways.defaults`. Values defined here override the defaults except in the case of annotations where both will be applied.
 
